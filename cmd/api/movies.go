@@ -1,9 +1,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
-	"time"
 
 	"movies.jackmartin.net/internal/data"
 	"movies.jackmartin.net/internal/validator"
@@ -54,18 +54,20 @@ func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Reques
 
 func (app *application) showMovieHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := app.readParamId(r)
-	if err != nil || id < 1 {
+	if err != nil {
 		app.notFoundResponse(w, r)
 		return
 	}
 
-	movie := data.Movie{
-		ID:        id,
-		Title:     "Shrek 2",
-		Runtime:   93,
-		Genres:    []string{"action", "comedy"},
-		Version:   1,
-		CreatedAt: time.Now(),
+	movie, err := app.models.Movies.Get(id)
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrRecordNotFound):
+			app.notFoundResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+		return
 	}
 
 	err = app.writeJSON(w, http.StatusOK, envelope{"movie": movie}, nil)
