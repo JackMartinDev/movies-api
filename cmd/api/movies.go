@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"movies.jackmartin.net/internal/data"
 	"movies.jackmartin.net/internal/validator"
@@ -11,10 +12,14 @@ import (
 
 func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		Title   string   `json:"title"`
-		Year    int32    `json:"year"`
-		Runtime int32    `json:"runtime"`
-		Genres  []string `json:"genres"`
+		Title       string    `json:"title"`
+		Overview    string    `json:"overview"`
+		Language    string    `json:"language"`
+		ReleaseDate time.Time `json:"release_date"`
+		Rating      float32   `json:"rating"`
+		PosterURL   string    `json:"poster_url"`
+		BackdropURL string    `json:"backdrop_url"`
+		Genres      []string  `json:"genres"`
 	}
 
 	err := app.readJSON(w, r, &input)
@@ -24,10 +29,14 @@ func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	movie := &data.Movie{
-		Title:   input.Title,
-		Year:    input.Year,
-		Runtime: input.Runtime,
-		Genres:  input.Genres,
+		Title:       input.Title,
+		Overview:    input.Overview,
+		Language:    input.Language,
+		ReleaseDate: input.ReleaseDate,
+		Rating:      input.Rating,
+		PosterURL:   input.PosterURL,
+		BackdropURL: input.BackdropURL,
+		Genres:      input.Genres,
 	}
 
 	v := validator.New()
@@ -93,7 +102,7 @@ func (app *application) listMoviesHandler(w http.ResponseWriter, r *http.Request
 	input.Filters.PageSize = app.readInt(qs, "page_size", 20, v)
 	input.Filters.Sort = app.readString(qs, "sort", "id")
 
-	input.Filters.SortSafelist = []string{"id", "title", "year", "runtime", "-id", "-title", "-year", "-runtime"}
+	input.Filters.SortSafelist = []string{"id", "title", "release", "-id", "-title", "-release"}
 
 	if data.ValidateFilters(v, input.Filters); !v.Valid() {
 		app.failedValidationResponse(w, r, v.Errors)
@@ -154,10 +163,14 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	var input struct {
-		Title   *string  `json:"title"`
-		Year    *int32   `json:"year"`
-		Runtime *int32   `json:"runtime"`
-		Genres  []string `json:"genres"`
+		Title       *string    `json:"title"`
+		Overview    *string    `json:"overview"`
+		Language    *string    `json:"language"`
+		ReleaseDate *time.Time `json:"release_date"`
+		Rating      *float32   `json:"rating"`
+		PosterURL   *string    `json:"poster_url"`
+		BackdropURL *string    `json:"backdrop_url"`
+		Genres      []string   `json:"genres"`
 	}
 
 	err = app.readJSON(w, r, &input)
@@ -165,16 +178,33 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 		app.badRequestResponse(w, r, err)
 		return
 	}
+
 	if input.Title != nil {
 		movie.Title = *input.Title
 	}
 
-	if input.Year != nil {
-		movie.Year = *input.Year
+	if input.Overview != nil {
+		movie.Overview = *input.Overview
 	}
 
-	if input.Runtime != nil {
-		movie.Runtime = *input.Runtime
+	if input.Language != nil {
+		movie.Language = *input.Language
+	}
+
+	if input.ReleaseDate != nil {
+		movie.ReleaseDate = *input.ReleaseDate
+	}
+
+	if input.Rating != nil {
+		movie.Rating = *input.Rating
+	}
+
+	if input.PosterURL != nil {
+		movie.PosterURL = *input.PosterURL
+	}
+
+	if input.BackdropURL != nil {
+		movie.BackdropURL = *input.BackdropURL
 	}
 
 	if input.Genres != nil {

@@ -12,13 +12,17 @@ import (
 )
 
 type Movie struct {
-	ID        int64     `json:"id"`
-	Title     string    `json:"title"`
-	Year      int32     `json:"year,omitempty"`
-	Runtime   int32     `json:"runtime,omitempty"`
-	Genres    []string  `json:"genres,omitempty"`
-	Version   int32     `json:"version"`
-	CreatedAt time.Time `json:"-"`
+	ID          int64     `json:"id"`
+	Title       string    `json:"title"`
+	Overview    string    `json:"overview"`
+	Language    string    `json:"language"`
+	ReleaseDate time.Time `json:"release_date"`
+	Rating      float32   `json:"vote_average"`
+	PosterURL   string    `json:"poster_url"`
+	BackdropURL string    `json:"backdrop_url"`
+	Genres      []string  `json:"genres"`
+	Version     int32     `json:"version"`
+	CreatedAt   time.Time `json:"-"`
 }
 
 type MovieModel struct {
@@ -27,15 +31,24 @@ type MovieModel struct {
 
 func (m MovieModel) Insert(movie *Movie) error {
 	query := `
-    INSERT INTO movies (title, year, runtime, genres) 
-    VALUES ($1, $2, $3, $4)
+    INSERT INTO movies (title, overview, language, release_date, rating, poster_url, backdrop_url, genres) 
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     RETURNING id, created_at, version`
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 
 	defer cancel()
 
-	args := []any{movie.Title, movie.Year, movie.Runtime, pq.Array(movie.Genres)}
+	args := []any{
+		movie.Title,
+		movie.Overview,
+		movie.Language,
+		movie.ReleaseDate,
+		movie.Rating,
+		movie.PosterURL,
+		movie.BackdropURL,
+		pq.Array(movie.Genres),
+	}
 
 	return m.DB.QueryRowContext(ctx, query, args...).Scan(&movie.ID, &movie.CreatedAt, &movie.Version)
 }
@@ -46,7 +59,7 @@ func (m MovieModel) Get(id int64) (*Movie, error) {
 	}
 
 	query := `
-    SELECT id, created_at, title, year, runtime, genres, version
+    SELECT id, created_at, title, overview, language, release_date, rating, poster_url, backdrop_url, genres, version
     FROM movies
     WHERE id = $1`
 
@@ -60,8 +73,12 @@ func (m MovieModel) Get(id int64) (*Movie, error) {
 		&movie.ID,
 		&movie.CreatedAt,
 		&movie.Title,
-		&movie.Year,
-		&movie.Runtime,
+		&movie.Overview,
+		&movie.Language,
+		&movie.ReleaseDate,
+		&movie.Rating,
+		&movie.PosterURL,
+		&movie.BackdropURL,
 		pq.Array(&movie.Genres),
 		&movie.Version,
 	)
@@ -80,7 +97,7 @@ func (m MovieModel) Get(id int64) (*Movie, error) {
 
 func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*Movie, Metadata, error) {
 	query := fmt.Sprintf(`
-    SELECT count(*) OVER(), id, created_at, title, year, runtime, genres, version
+    SELECT count(*) OVER(), id, created_at, title, overview, language, release_date, rating, poster_url, backdrop_url, genres, version
     FROM movies
     WHERE (to_tsvector('simple', title) @@ plainto_tsquery('simple', $1) OR $1 = '')
     AND (genres @> $2 OR $2 = '{}')
@@ -111,8 +128,12 @@ func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*M
 			&movie.ID,
 			&movie.CreatedAt,
 			&movie.Title,
-			&movie.Year,
-			&movie.Runtime,
+			&movie.Overview,
+			&movie.Language,
+			&movie.ReleaseDate,
+			&movie.Rating,
+			&movie.PosterURL,
+			&movie.BackdropURL,
 			pq.Array(&movie.Genres),
 			&movie.Version,
 		)
@@ -136,8 +157,8 @@ func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*M
 func (m MovieModel) Update(movie *Movie) error {
 	query := `
     UPDATE movies 
-    SET title = $1, year = $2, runtime = $3, genres = $4, version = version + 1
-    WHERE id = $5 AND version = $6
+    SET title = $1, overview = $2, language = $3, release_date = $4, rating = $5, poster_url = $6, backdrop_url = $7, genres = $8, version = version + 1
+    WHERE id = $9 AND version = $10
     RETURNING version`
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -145,10 +166,14 @@ func (m MovieModel) Update(movie *Movie) error {
 	defer cancel()
 
 	args := []any{
-		movie.Title,
-		movie.Year,
-		movie.Runtime,
-		pq.Array(movie.Genres),
+		&movie.Title,
+		&movie.Overview,
+		&movie.Language,
+		&movie.ReleaseDate,
+		&movie.Rating,
+		&movie.PosterURL,
+		&movie.BackdropURL,
+		pq.Array(&movie.Genres),
 		movie.ID,
 		movie.Version,
 	}
@@ -200,12 +225,9 @@ func ValidateMovie(v *validator.Validator, movie *Movie) {
 	v.Check(movie.Title != "", "title", "must be provided")
 	v.Check(len(movie.Title) <= 500, "title", "must not be more than 500 bytes long")
 
-	v.Check(movie.Year != 0, "year", "must be provided")
-	v.Check(movie.Year >= 1888, "year", "must be greater than 1888")
-	v.Check(movie.Year <= int32(time.Now().Year()), "year", "must not be in the future")
-
-	v.Check(movie.Runtime != 0, "runtime", "must be provided")
-	v.Check(movie.Runtime > 0, "runtime", "must be a positive integer")
+	v.Check(!movie.ReleaseDate.IsZero(), "release_date", "must be provided")
+	v.Check(movie.ReleaseDate.Year() >= 1888, "release_date", "year must be greater than 1888")
+	v.Check(movie.ReleaseDate.Before(time.Now()), "release_date", "must not be in the future")
 
 	v.Check(movie.Genres != nil, "genres", "must be provided")
 	v.Check(len(movie.Genres) >= 1, "genres", "must contain at least 1 genre")
