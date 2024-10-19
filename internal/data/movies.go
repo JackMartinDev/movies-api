@@ -17,7 +17,7 @@ type Movie struct {
 	Overview    string    `json:"overview"`
 	Language    string    `json:"language"`
 	ReleaseDate time.Time `json:"release_date"`
-	Rating      float32   `json:"vote_average"`
+	Rating      float32   `json:"rating"`
 	PosterURL   string    `json:"poster_url"`
 	BackdropURL string    `json:"backdrop_url"`
 	Genres      []string  `json:"genres"`
