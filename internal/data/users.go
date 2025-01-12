@@ -2,7 +2,6 @@ package data
 
 import (
 	"context"
-	"crypto/x509"
 	"database/sql"
 	"errors"
 	"time"
